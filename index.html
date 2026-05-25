@@ -160,6 +160,65 @@
         let allTickers = []; // Will store tickers from tickers.json
         let tickerSearchTimeout = null;
         
+        // Fallback ticker list (used if tickers.json is empty or fails to load)
+        const FALLBACK_TICKERS = [
+            {symbol:'AAPL',name:'Apple Inc.'},{symbol:'MSFT',name:'Microsoft Corp.'},{symbol:'GOOGL',name:'Alphabet Inc.'},
+            {symbol:'AMZN',name:'Amazon.com Inc.'},{symbol:'TSLA',name:'Tesla Inc.'},{symbol:'META',name:'Meta Platforms'},
+            {symbol:'NVDA',name:'NVIDIA Corp.'},{symbol:'AMD',name:'Advanced Micro Devices'},{symbol:'INTC',name:'Intel Corp.'},
+            {symbol:'VOO',name:'Vanguard S&P 500'},{symbol:'VTI',name:'Vanguard Total Market'},{symbol:'SPY',name:'SPDR S&P 500'},
+            {symbol:'QQQ',name:'Invesco QQQ Trust'},{symbol:'VEA',name:'Vanguard Developed Markets'},{symbol:'VT',name:'Vanguard Total World'},
+            {symbol:'JPM',name:'JPMorgan Chase'},{symbol:'V',name:'Visa Inc.'},{symbol:'MA',name:'Mastercard'},
+            {symbol:'JNJ',name:'Johnson & Johnson'},{symbol:'UNH',name:'UnitedHealth Group'},{symbol:'HD',name:'Home Depot'},
+            {symbol:'PG',name:'Procter & Gamble'},{symbol:'DIS',name:'Walt Disney Co.'},{symbol:'PYPL',name:'PayPal Holdings'},
+            {symbol:'KO',name:'Coca-Cola Co.'},{symbol:'PEP',name:'PepsiCo Inc.'},{symbol:'MCD',name:"McDonald's Corp."},
+            {symbol:'NKE',name:'Nike Inc.'},{symbol:'ORCL',name:'Oracle Corp.'},{symbol:'IBM',name:'IBM Corp.'},
+            {symbol:'QCOM',name:'Qualcomm Inc.'},{symbol:'TXN',name:'Texas Instruments'},{symbol:'BA',name:'Boeing Co.'},
+            {symbol:'CAT',name:'Caterpillar Inc.'},{symbol:'HON',name:'Honeywell Intl.'},{symbol:'UPS',name:'United Parcel Service'},
+            {symbol:'XOM',name:'Exxon Mobil'},{symbol:'CVX',name:'Chevron Corp.'},{symbol:'COP',name:'ConocoPhillips'},
+            {symbol:'ABBV',name:'AbbVie Inc.'},{symbol:'LLY',name:'Eli Lilly'},{symbol:'MRK',name:'Merck & Co.'},
+            {symbol:'PFE',name:'Pfizer Inc.'},{symbol:'BMY',name:'Bristol-Myers Squibb'},{symbol:'AMGN',name:'Amgen Inc.'},
+            {symbol:'ISRG',name:'Intuitive Surgical'},{symbol:'MDT',name:'Medtronic PLC'},{symbol:'SYK',name:'Stryker Corp.'},
+            {symbol:'BAC',name:'Bank of America'},{symbol:'WFC',name:'Wells Fargo'},{symbol:'GS',name:'Goldman Sachs'},
+            {symbol:'MS',name:'Morgan Stanley'},{symbol:'AXP',name:'American Express'},{symbol:'C',name:'Citigroup'},
+            {symbol:'BTC-USD',name:'Bitcoin USD'},{symbol:'ETH-USD',name:'Ethereum USD'},{symbol:'COIN',name:'Coinbase Global'},
+            {symbol:'SBUX',name:'Starbucks Corp.'},{symbol:'CMCSA',name:'Comcast Corp.'},{symbol:'T',name:'AT&T Inc.'},
+            {symbol:'VZ',name:'Verizon'},{symbol:'TMUS',name:'T-Mobile US'},{symbol:'WMT',name:'Walmart Inc.'},
+            {symbol:'TGT',name:'Target Corp.'},{symbol:'COST',name:'Costco Wholesale'},{symbol:'LOW',name:"Lowe's Cos."},
+            {symbol:'LULU',name:'Lululemon Athletica'},{symbol:'ROST',name:'Ross Stores'},{symbol:'DG',name:'Dollar General'},
+            {symbol:'DLTR',name:'Dollar Tree'},{symbol:'RTX',name:'RTX Corp.'},{symbol:'DE',name:'John Deere'},
+            {symbol:'CCJ',name:'Cameco Corp.'},{symbol:'NEE',name:'NextEra Energy'},{symbol:'BND',name:'Vanguard Total Bond'},
+            {symbol:'VNQ',name:'Vanguard Real Estate'},{symbol:'XLE',name:'Energy Select SPDR'},{symbol:'XLV',name:'Health Care SPDR'},
+            {symbol:'XLK',name:'Tech SPDR'},{symbol:'XLF',name:'Financial SPDR'},{symbol:'SHOP',name:'Shopify Inc.'},
+            {symbol:'SQ',name:'Block Inc.'},{symbol:'UBER',name:'Uber Technologies'},{symbol:'LYFT',name:'Lyft Inc.'},
+            {symbol:'SNOW',name:'Snowflake Inc.'},{symbol:'NOW',name:'ServiceNow'},{symbol:'PLTR',name:'Palantir Technologies'},
+            {symbol:'NET',name:'Cloudflare Inc.'},{symbol:'DDOG',name:'Datadog Inc.'},{symbol:'SNAP',name:'Snap Inc.'},
+            {symbol:'ZM',name:'Zoom Video'},{symbol:'SPOT',name:'Spotify Technology'},{symbol:'ROKU',name:'Roku Inc.'},
+            {symbol:'NFLX',name:'Netflix Inc.'},{symbol:'CRM',name:'Salesforce Inc.'},{symbol:'ADBE',name:'Adobe Inc.'},
+            {symbol:'INTC',name:'Intel Corp.'},{symbol:'AMD',name:'Advanced Micro Devices'},{symbol:'AVGO',name:'Broadcom Inc.'},
+            {symbol:'MU',name:'Micron Technology'},{symbol:'TXN',name:'Texas Instruments'},{symbol:'ORCL',name:'Oracle Corp.'},
+            {symbol:'SAP',name:'SAP SE'},{symbol:'INTU',name:'Intuit Inc.'},{symbol:'ADP',name:'Automatic Data Proc.'},
+            {symbol:'FIS',name:'Fidelity National Info.'},{symbol:'FISV',name:'Fiserv Inc.'},{symbol:'GPN',name:'Global Payments'},
+            {symbol:'PAYX',name:'Paychex Inc.'},{symbol:'ADSK',name:'Autodesk Inc.'},{symbol:'PANW',name:'Palo Alto Networks'},
+            {symbol:'CRWD',name:'CrowdStrike'},{symbol:'ZS',name:'Zscaler Inc.'},{symbol:'OKTA',name:'Okta Inc.'},
+            {symbol:'HUBS',name:'HubSpot Inc.'},{symbol:'TWLO',name:'Twilio Inc.'},{symbol:'MSTR',name:'MicroStrategy'},
+            {symbol:'MRNA',name:'Moderna Inc.'},{symbol:'REGN',name:'Regeneron Pharma'},{symbol:'BIIB',name:'Biogen Inc.'},
+            {symbol:'TMO',name:'Thermo Fisher'},{symbol:'ABT',name:'Abbott Labs'},{symbol:'DHR',name:'Danaher Corp.'},
+            {symbol:'EW',name:'Edwards Lifesciences'},{symbol:'VRTX',name:'Vertex Pharmaceuticals'},
+            {symbol:'GE',name:'General Electric'},{symbol:'MMM',name:'3M Co.'},{symbol:'CAT',name:'Caterpillar Inc.'},
+            {symbol:'BA',name:'Boeing Co.'},{symbol:'HON',name:'Honeywell Intl.'},{symbol:'UPS',name:'United Parcel Service'},
+            {symbol:'FDX',name:'FedEx Corp.'},{symbol:'EMR',name:'Emerson Electric'},{symbol:'ITW',name:'Illinois Tool Works'},
+            {symbol:'ETN',name:'Eaton Corp.'},{symbol:'APH',name:'Amphenol Corp.'},{symbol:'PH',name:'Parker-Hannifin'},
+            {symbol:'ROK',name:'Rockwell Automation'},{symbol:'SLB',name:'Schlumberger'},{symbol:'EOG',name:'EOG Resources'},
+            {symbol:'MPC',name:'Marathon Petroleum'},{symbol:'PSX',name:'Phillips 66'},{symbol:'VLO',name:'Valero Energy'},
+            {symbol:'OXY',name:'Occidental Petroleum'},{symbol:'DUK',name:'Duke Energy'},{symbol:'SO',name:'Southern Co.'},
+            {symbol:'D',name:'Dominion Energy'},{symbol:'AEP',name:'American Electric Power'},{symbol:'EXC',name:'Exelon Corp.'},
+            {symbol:'CME',name:'CME Group'},{symbol:'ICE',name:'Intercontinental Exchange'},{symbol:'BLK',name:'BlackRock Inc.'},
+            {symbol:'SPGI',name:'S&P Global Inc.'},{symbol:'MCO',name:"Moody's Corp."},{symbol:'BRK.B',name:'Berkshire Hathaway'},
+            {symbol:'VWO',name:'Vanguard Emerging Markets'},{symbol:'IWM',name:'iShares Russell 2000'},
+            {symbol:'EFA',name:'iShares EAFE'},{symbol:'EWJ',name:'iShares Japan'},{symbol:'EWZ',name:'iShares Brazil'},
+            {symbol:'VGT',name:'Vanguard Info Tech'},{symbol:'VHT',name:'Vanguard Health Care'}
+        ];
+        
         function formatCurrency(v) { return '€' + v.toFixed(2).replace('.', ','); }
         function formatPercent(v) { return (v >= 0 ? '+' : '') + v.toFixed(2) + '%'; }
         
@@ -283,11 +342,11 @@
         async function loadData() {
             const [prResp, tkrResp] = await Promise.all([
                 fetch(PRICES_URL + '?t=' + Date.now()),
-                fetch(TICKERS_URL + '?t=' + Date.now())
+                fetch(TICKERS_URL + '?t=' + Date.now()).catch(() => ({json:()=>({tickers:[]})})
             ]);
             prices = await prResp.json();
-            const tickersData = await tkrResp.json();
-            allTickers = tickersData.tickers || [];
+            const tickersData = await tkrResp.json().catch(() => ({tickers:[]}));
+            allTickers = (tickersData.tickers && tickersData.tickers.length > 0) ? tickersData.tickers : FALLBACK_TICKERS;
             loadPortfolioFromStorage();
         }
         
