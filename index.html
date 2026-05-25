@@ -43,14 +43,14 @@
         .toast { position: fixed; bottom: 20px; right: 20px; background: #00ff88; color: #000; padding: 12px 24px; border-radius: 8px; font-weight: bold; display: none; z-index: 1000; }
         .toast.show { display: block; }
         
-        /* Modal */
+        /* Modal - simple 3 fields */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center; }
         .modal.show { display: flex; }
-        .modal-content { background: #1a1a2e; border-radius: 16px; padding: 30px; width: 90%; max-width: 500px; }
+        .modal-content { background: #1a1a2e; border-radius: 16px; padding: 30px; width: 90%; max-width: 450px; }
         .modal-content h3 { margin-bottom: 20px; color: #00d4ff; }
         .modal-form { display: flex; flex-direction: column; gap: 15px; }
         .modal-form label { display: block; font-size: 0.85rem; color: #888; }
-        .modal-form input, .modal-form select { background: #252540; border: 1px solid #333; border-radius: 8px; padding: 12px; color: #fff; width: 100%; }
+        .modal-form input, .modal-form select { background: #252540; border: 1px solid #333; border-radius: 8px; padding: 12px; color: #fff; width: 100%; font-size: 1rem; }
         .modal-buttons { display: flex; gap: 10px; margin-top: 20px; }
         .modal-buttons button { flex: 1; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
         .btn-cancel { background: #444; color: #fff; }
@@ -58,11 +58,11 @@
         .btn-delete { background: #ff4444; color: #fff; }
         .btn-add { background: linear-gradient(135deg, #00d4ff, #7b2fff); border: none; border-radius: 8px; padding: 8px 16px; cursor: pointer; font-size: 0.85rem; }
         
-        /* Portfolio selector */
-        .portfolio-selector { display: flex; gap: 10px; margin-bottom: 20px; }
-        .portfolio-btn { background: #252540; border: 1px solid #333; border-radius: 8px; padding: 10px 20px; color: #fff; cursor: pointer; }
-        .portfolio-btn.active { background: #00d4ff; color: #000; border-color: #00d4ff; }
-        .portfolio-name { font-size: 1.2rem; color: #00d4ff; margin-bottom: 15px; }
+        /* Preview of calculated values */
+        .calc-preview { background: #252540; border-radius: 8px; padding: 15px; margin-top: 10px; }
+        .calc-preview-row { display: flex; justify-content: space-between; padding: 5px 0; }
+        .calc-preview-label { color: #888; }
+        .calc-preview-value { font-weight: bold; }
         
         @media (max-width: 768px) { .sim-form { grid-template-columns: 1fr; } h1 { font-size: 1.8rem; } }
     </style>
@@ -75,12 +75,6 @@
         </header>
         <div class="loading" id="loading"><div class="loading-spinner"></div><p>Loading data...</p></div>
         <div id="content" style="display: none;">
-            <div class="portfolio-selector">
-                <button class="portfolio-btn active" onclick="switchPortfolio('default')">My Portfolio</button>
-                <button class="portfolio-btn" onclick="switchPortfolio('s&P 500 (SPY)')">S&P 500 (SPY)</button>
-            </div>
-            <p class="portfolio-name" id="portfolio-name">My Portfolio</p>
-            
             <div class="section">
                 <div class="summary-cards">
                     <div class="card"><div class="card-label">Total Invested</div><div class="card-value" id="total-invested">-</div></div>
@@ -110,7 +104,7 @@
             <div class="section">
                 <h2>📜 Purchase History</h2>
                 <table class="portfolio-table">
-                    <thead><tr><th>Date</th><th>Ticker</th><th>Company</th><th>Shares</th><th>Price/Share</th><th>Total</th><th>Notes</th><th></th></tr></thead>
+                    <thead><tr><th>Date</th><th>Ticker</th><th>Shares</th><th>Price/Share</th><th>Amount</th><th></th></tr></thead>
                     <tbody id="history-body"></tbody>
                 </table>
             </div>
@@ -118,18 +112,19 @@
         </div>
     </div>
     
-    <!-- Add/Edit Modal -->
+    <!-- Simple Add/Edit Modal -->
     <div class="modal" id="purchase-modal">
         <div class="modal-content">
             <h3 id="modal-title">Add Purchase</h3>
             <div class="modal-form">
                 <div><label>Date</label><input type="date" id="p-date"></div>
-                <div><label>Ticker</label><input type="text" id="p-ticker" placeholder="VOO, AAPL, SPY..." list="ticker-list"></div>
+                <div><label>Ticker</label><input type="text" id="p-ticker" placeholder="MSFT, VOO, SPY..." list="ticker-list" oninput="updateCalcPreview()"></div>
                 <datalist id="ticker-list"><option value="VOO"><option value="VTI"><option value="SPY"><option value="QQQ"><option value="AAPL"><option value="MSFT"><option value="CCJ"><option value="NEE"><option value="VEA"><option value="VT"><option value="BND"></datalist>
-                <div><label>Company (optional)</label><input type="text" id="p-company" placeholder="Auto-filled if empty"></div>
-                <div><label>Shares</label><input type="number" id="p-shares" step="0.0001" placeholder="10"></div>
-                <div><label>Price per Share (€)</label><input type="number" id="p-price" step="0.01" placeholder="100"></div>
-                <div><label>Notes (optional)</label><input type="text" id="p-notes" placeholder=""></div>
+                <div><label>Amount (€)</label><input type="number" id="p-amount" placeholder="1000" oninput="updateCalcPreview()"></div>
+            </div>
+            <div class="calc-preview" id="calc-preview" style="display:none;">
+                <div class="calc-preview-row"><span class="calc-preview-label">Shares:</span><span class="calc-preview-value" id="preview-shares">-</span></div>
+                <div class="calc-preview-row"><span class="calc-preview-label">Price/share:</span><span class="calc-preview-value" id="preview-price">-</span></div>
             </div>
             <div class="modal-buttons">
                 <button class="btn-cancel" onclick="closeModal()">Cancel</button>
@@ -142,15 +137,14 @@
     <div class="toast" id="toast"></div>
 
     <script>
-        const PORTFOLIO_KEY = 'invsim_portfolio';
+        const PORTFOLIO_KEY = 'inv_sim_portfolio';
         const PRICES_URL = 'data/prices.json';
         
         let portfolio = { purchases: [] };
         let prices = { prices: {}, history: {} };
         let editingIndex = null;
-        let currentPortfolio = 'default';
         
-        function formatCurrency(v) { return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v); }
+        function formatCurrency(v) { return '€' + v.toFixed(2).replace('.', ','); }
         function formatPercent(v) { return (v >= 0 ? '+' : '') + v.toFixed(2) + '%'; }
         
         function getCompanyName(ticker) {
@@ -171,9 +165,7 @@
         function loadPortfolioFromStorage() {
             const saved = localStorage.getItem(PORTFOLIO_KEY);
             if (saved) {
-                try {
-                    portfolio = JSON.parse(saved);
-                } catch (e) {}
+                try { portfolio = JSON.parse(saved); } catch (e) {}
             }
         }
         
@@ -184,18 +176,52 @@
             setTimeout(() => t.classList.remove('show'), 3000);
         }
         
+        function getPriceAtDate(ticker, dateStr) {
+            const tickerData = prices.history[ticker];
+            if (!tickerData) return null;
+            
+            const weekly = tickerData.weekly || {};
+            const monthly = tickerData.monthly || {};
+            
+            let price = null;
+            for (const d of Object.keys(weekly).sort()) {
+                if (d <= dateStr) price = weekly[d];
+            }
+            if (!price) {
+                for (const d of Object.keys(monthly).sort()) {
+                    if (d <= dateStr) price = monthly[d];
+                }
+            }
+            return price;
+        }
+        
+        function updateCalcPreview() {
+            const ticker = document.getElementById('p-ticker').value.toUpperCase();
+            const dateStr = document.getElementById('p-date').value;
+            const amount = parseFloat(document.getElementById('p-amount').value);
+            
+            const preview = document.getElementById('calc-preview');
+            if (!ticker || !dateStr || !amount || amount <= 0) {
+                preview.style.display = 'none';
+                return;
+            }
+            
+            const price = getPriceAtDate(ticker, dateStr);
+            if (!price) {
+                preview.style.display = 'none';
+                return;
+            }
+            
+            const shares = amount / price;
+            document.getElementById('preview-shares').textContent = shares.toFixed(4);
+            document.getElementById('preview-price').textContent = formatCurrency(price) + '/share';
+            preview.style.display = 'block';
+        }
+        
         async function loadData() {
             const prResp = await fetch(PRICES_URL + '?t=' + Date.now());
             prices = await prResp.json();
             loadPortfolioFromStorage();
-        }
-        
-        function switchPortfolio(name) {
-            currentPortfolio = name;
-            document.querySelectorAll('.portfolio-btn').forEach(b => b.classList.remove('active'));
-            event.target.classList.add('active');
-            document.getElementById('portfolio-name').textContent = name;
-            render();
         }
         
         function render() {
@@ -206,10 +232,9 @@
                 const currentPrice = cur.current || price;
                 const currentValue = shares * currentPrice;
                 const invested = shares * price;
-                const gain = currentValue - invested;
                 totalInvested += invested;
                 totalCurrentValue += currentValue;
-                return { ...p, idx, shares, price, currentPrice, priceChange: cur.changePercent || 0, invested, currentValue, gain, gainPercent: invested > 0 ? gain / invested * 100 : 0 };
+                return { ...p, idx, shares, price, currentPrice, priceChange: cur.changePercent || 0, invested, currentValue, gain: currentValue - invested, gainPercent: invested > 0 ? (currentValue - invested) / invested * 100 : 0 };
             });
             
             const totalGain = totalCurrentValue - totalInvested;
@@ -217,21 +242,19 @@
             
             document.getElementById('total-invested').textContent = formatCurrency(totalInvested);
             document.getElementById('current-value').textContent = formatCurrency(totalCurrentValue);
-            
             const glEl = document.getElementById('gain-loss');
             glEl.textContent = formatCurrency(totalGain);
             glEl.className = 'card-value ' + (totalGain >= 0 ? 'positive' : 'negative');
-            
             const gpEl = document.getElementById('gain-percent');
             gpEl.textContent = formatPercent(totalGainPercent);
             gpEl.className = 'card-value ' + (totalGainPercent >= 0 ? 'positive' : 'negative');
             
-            // Portfolio table
+            // Holdings table
             document.getElementById('portfolio-body').innerHTML = items.length ? items.map(i => `
                 <tr>
                     <td class="ticker">${i.ticker}</td>
                     <td class="company">${i.company || getCompanyName(i.ticker)}</td>
-                    <td>${i.shares}</td>
+                    <td>${i.shares.toFixed(4)}</td>
                     <td>${formatCurrency(i.price)}</td>
                     <td>${formatCurrency(i.currentPrice)}</td>
                     <td class="${i.priceChange >= 0 ? 'positive' : 'negative'}">${formatPercent(i.priceChange)}</td>
@@ -242,18 +265,17 @@
                 </tr>
             `).join('') : '<tr><td colspan="10" style="text-align:center;color:#888;padding:40px;">No purchases yet. Click "+ Add Purchase" to start!</td></tr>';
             
-            // History table
+            // History table (simplified)
             const sorted = [...portfolio.purchases].reverse();
             document.getElementById('history-body').innerHTML = sorted.map((p, idx) => {
                 const realIdx = portfolio.purchases.length - 1 - idx;
+                const amount = parseFloat(p.shares) * parseFloat(p.price);
                 return `<tr>
                     <td>${p.date}</td>
                     <td class="ticker">${p.ticker}</td>
-                    <td class="company">${p.company || getCompanyName(p.ticker)}</td>
-                    <td>${p.shares}</td>
+                    <td>${parseFloat(p.shares).toFixed(4)}</td>
                     <td>${formatCurrency(parseFloat(p.price))}</td>
-                    <td>${formatCurrency(parseFloat(p.shares) * parseFloat(p.price))}</td>
-                    <td>${p.notes || '-'}</td>
+                    <td>${formatCurrency(amount)}</td>
                     <td><button onclick="editPurchase(${realIdx})" style="background:#444;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;color:#fff;">✏️</button></td>
                 </tr>`;
             }).join('');
@@ -273,10 +295,8 @@
             document.getElementById('modal-title').textContent = 'Add Purchase';
             document.getElementById('p-date').valueAsDate = new Date();
             document.getElementById('p-ticker').value = '';
-            document.getElementById('p-company').value = '';
-            document.getElementById('p-shares').value = '';
-            document.getElementById('p-price').value = '';
-            document.getElementById('p-notes').value = '';
+            document.getElementById('p-amount').value = '';
+            document.getElementById('calc-preview').style.display = 'none';
             document.getElementById('btn-delete').style.display = 'none';
             document.getElementById('purchase-modal').classList.add('show');
         }
@@ -287,10 +307,8 @@
             document.getElementById('modal-title').textContent = 'Edit Purchase';
             document.getElementById('p-date').value = p.date;
             document.getElementById('p-ticker').value = p.ticker;
-            document.getElementById('p-company').value = p.company || '';
-            document.getElementById('p-shares').value = p.shares;
-            document.getElementById('p-price').value = p.price;
-            document.getElementById('p-notes').value = p.notes || '';
+            document.getElementById('p-amount').value = (parseFloat(p.shares) * parseFloat(p.price)).toFixed(2);
+            updateCalcPreview();
             document.getElementById('btn-delete').style.display = 'block';
             document.getElementById('purchase-modal').classList.add('show');
         }
@@ -300,26 +318,38 @@
         }
         
         function savePurchase() {
-            const date = document.getElementById('p-date').value;
+            const dateStr = document.getElementById('p-date').value;
             const ticker = document.getElementById('p-ticker').value.toUpperCase();
-            const company = document.getElementById('p-company').value;
-            const shares = parseFloat(document.getElementById('p-shares').value);
-            const price = parseFloat(document.getElementById('p-price').value);
-            const notes = document.getElementById('p-notes').value;
+            const amount = parseFloat(document.getElementById('p-amount').value);
             
-            if (!date || !ticker || !shares || !price) {
-                alert('Fill in all required fields');
+            if (!dateStr || !ticker || !amount || amount <= 0) {
+                alert('Fill in all fields');
                 return;
             }
             
-            const purchase = { date, ticker, company: company || getCompanyName(ticker), shares, price, notes };
+            const priceAtDate = getPriceAtDate(ticker, dateStr);
+            if (!priceAtDate) {
+                alert('No price data for ' + ticker + ' on ' + dateStr + '. Try a more recent date.');
+                return;
+            }
+            
+            const shares = amount / priceAtDate;
+            const price = priceAtDate;
+            
+            const purchase = {
+                date: dateStr,
+                ticker: ticker,
+                company: getCompanyName(ticker),
+                shares: shares,
+                price: price
+            };
             
             if (editingIndex !== null) {
                 portfolio.purchases[editingIndex] = purchase;
                 showToast('✅ Purchase updated!');
             } else {
                 portfolio.purchases.push(purchase);
-                showToast('✅ Purchase added!');
+                showToast('✅ ' + formatCurrency(amount) + ' in ' + ticker + ' added!');
             }
             
             savePortfolioToStorage();
@@ -352,41 +382,26 @@
             }
             
             const buyDate = new Date(dateStr);
-            const dateStrSort = dateStr;
+            const price = getPriceAtDate(ticker, dateStr);
             
-            const weekly = tickerData.weekly || {};
-            const monthly = tickerData.monthly || {};
-            
-            // Find closest price <= requested date
-            let buyPrice = null;
-            for (const d of Object.keys(weekly).sort()) {
-                if (d <= dateStrSort) buyPrice = weekly[d];
-            }
-            if (!buyPrice) {
-                for (const d of Object.keys(monthly).sort()) {
-                    if (d <= dateStrSort) buyPrice = monthly[d];
-                }
-            }
-            
-            if (!buyPrice) {
+            if (!price) {
                 document.getElementById('sim-result').classList.add('show');
                 document.getElementById('sim-result').innerHTML = `<p style="color:#ff4444;">❌ No data for ${ticker} on ${buyDate.toLocaleDateString('es-ES')}</p><p style="color:#888;font-size:0.85rem;margin-top:10px;">Try a more recent date.</p>`;
                 return;
             }
             
+            const shares = amount / price;
             const curData = prices.prices[ticker];
-            const currentPrice = curData?.current || buyPrice;
-            const shares = amount / buyPrice;
+            const currentPrice = curData?.current || price;
             const currentValue = shares * currentPrice;
             const gain = currentValue - amount;
             const gainPercent = (gain / amount) * 100;
-            
             const years = ((new Date() - buyDate) / (1000 * 60 * 60 * 24 * 365)).toFixed(1);
             
             document.getElementById('sim-result').classList.add('show');
             document.getElementById('sim-result').innerHTML = `
-                <h3 style="margin-bottom:15px;color:#00d4ff;">📊 ${ticker}: €${amount.toFixed(2)} invested on ${buyDate.toLocaleDateString('es-ES')} (${years} years ago)</h3>
-                <p style="margin-bottom:10px;"><strong>Buy price:</strong> ${formatCurrency(buyPrice)} | <strong>Current price:</strong> ${formatCurrency(currentPrice)}</p>
+                <h3 style="margin-bottom:15px;color:#00d4ff;">📊 ${ticker}: ${formatCurrency(amount)} invested ${buyDate.toLocaleDateString('es-ES')} (${years} years ago)</h3>
+                <p style="margin-bottom:10px;"><strong>Buy price:</strong> ${formatCurrency(price)} | <strong>Current price:</strong> ${formatCurrency(currentPrice)}</p>
                 <p style="margin-bottom:10px;"><strong>Shares purchased:</strong> ${shares.toFixed(4)}</p>
                 <p style="margin-bottom:10px;"><strong>Current value:</strong> <span class="${gain >= 0 ? 'positive' : 'negative'}">${formatCurrency(currentValue)}</span></p>
                 <p><strong>Total gain/loss:</strong> <span class="${gain >= 0 ? 'positive' : 'negative'}" style="font-size:1.3rem;font-weight:bold;">${formatCurrency(gain)} (${formatPercent(gainPercent)})</span></p>
