@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simulador de Inversión</title>
+    <title>Investment Simulator</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -40,6 +40,8 @@
         .sim-result { margin-top: 20px; padding: 20px; background: #252540; border-radius: 12px; display: none; }
         .sim-result.show { display: block; }
         .last-updated { text-align: center; color: #666; font-size: 0.85rem; padding: 20px 0; }
+        .toast { position: fixed; bottom: 20px; right: 20px; background: #00ff88; color: #000; padding: 12px 24px; border-radius: 8px; font-weight: bold; display: none; z-index: 1000; }
+        .toast.show { display: block; }
         
         /* Modal */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center; }
@@ -54,7 +56,13 @@
         .btn-cancel { background: #444; color: #fff; }
         .btn-save { background: linear-gradient(135deg, #00d4ff, #7b2fff); color: #fff; }
         .btn-delete { background: #ff4444; color: #fff; }
-        .btn-add { background: #00ff88; color: #000; border: none; border-radius: 8px; padding: 8px 16px; cursor: pointer; font-size: 0.85rem; }
+        .btn-add { background: linear-gradient(135deg, #00d4ff, #7b2fff); border: none; border-radius: 8px; padding: 8px 16px; cursor: pointer; font-size: 0.85rem; }
+        
+        /* Portfolio selector */
+        .portfolio-selector { display: flex; gap: 10px; margin-bottom: 20px; }
+        .portfolio-btn { background: #252540; border: 1px solid #333; border-radius: 8px; padding: 10px 20px; color: #fff; cursor: pointer; }
+        .portfolio-btn.active { background: #00d4ff; color: #000; border-color: #00d4ff; }
+        .portfolio-name { font-size: 1.2rem; color: #00d4ff; margin-bottom: 15px; }
         
         @media (max-width: 768px) { .sim-form { grid-template-columns: 1fr; } h1 { font-size: 1.8rem; } }
     </style>
@@ -62,41 +70,47 @@
 <body>
     <div class="container">
         <header>
-            <h1>📈 Simulador de Inversión</h1>
-            <p class="subtitle">Portfolio ficticio - Aprende sin arriesgar</p>
+            <h1>📈 Investment Simulator</h1>
+            <p class="subtitle">Track your portfolio with fictional money — learn without risk</p>
         </header>
-        <div class="loading" id="loading"><div class="loading-spinner"></div><p>Cargando datos...</p></div>
+        <div class="loading" id="loading"><div class="loading-spinner"></div><p>Loading data...</p></div>
         <div id="content" style="display: none;">
+            <div class="portfolio-selector">
+                <button class="portfolio-btn active" onclick="switchPortfolio('default')">My Portfolio</button>
+                <button class="portfolio-btn" onclick="switchPortfolio('s&P 500 (SPY)')">S&P 500 (SPY)</button>
+            </div>
+            <p class="portfolio-name" id="portfolio-name">My Portfolio</p>
+            
             <div class="section">
                 <div class="summary-cards">
-                    <div class="card"><div class="card-label">Total Invertido</div><div class="card-value" id="total-invested">-</div></div>
-                    <div class="card"><div class="card-label">Valor Actual</div><div class="card-value" id="current-value">-</div></div>
-                    <div class="card"><div class="card-label">Ganancia/Pérdida</div><div class="card-value" id="gain-loss">-</div></div>
-                    <div class="card"><div class="card-label">% Ganancia Total</div><div class="card-value" id="gain-percent">-</div></div>
+                    <div class="card"><div class="card-label">Total Invested</div><div class="card-value" id="total-invested">-</div></div>
+                    <div class="card"><div class="card-label">Current Value</div><div class="card-value" id="current-value">-</div></div>
+                    <div class="card"><div class="card-label">Gain/Loss</div><div class="card-value" id="gain-loss">-</div></div>
+                    <div class="card"><div class="card-label">% Gain</div><div class="card-value" id="gain-percent">-</div></div>
                 </div>
             </div>
             <div class="section">
-                <h2>📋 Mi Portfolio <button class="btn-add" onclick="openAddModal()">+ Añadir compra</button></h2>
+                <h2>📋 My Holdings <button class="btn-add" onclick="openAddModal()">+ Add Purchase</button></h2>
                 <table class="portfolio-table">
-                    <thead><tr><th>Ticker</th><th>Empresa</th><th>Acciones</th><th>Precio Compra</th><th>Precio Actual</th><th>Cambio</th><th>Invertido</th><th>Valor Actual</th><th>Ganancia</th><th></th></tr></thead>
+                    <thead><tr><th>Ticker</th><th>Company</th><th>Shares</th><th>Buy Price</th><th>Current Price</th><th>Change</th><th>Invested</th><th>Current Value</th><th>Gain</th><th></th></tr></thead>
                     <tbody id="portfolio-body"></tbody>
                 </table>
             </div>
             <div class="sim-section">
-                <h2>🔮 Simulador Hipotético</h2>
-                <p style="color: #888; margin-bottom: 20px;">¿Cuánto habrías ganado si hubieras invertido hace X años?</p>
+                <h2>🔮 Hypothetical Simulator</h2>
+                <p style="color: #888; margin-bottom: 20px;">How much would you have earned if you had invested X years ago?</p>
                 <div class="sim-form">
                     <div><label>Ticker</label><select id="sim-ticker"><option value="SPY">SPY (S&P 500)</option><option value="VOO">VOO (S&P 500)</option><option value="VTI">VTI (Total Market)</option><option value="QQQ">QQQ (NASDAQ)</option><option value="AAPL">AAPL</option><option value="MSFT">MSFT</option></select></div>
-                    <div><label>Fecha inversión</label><input type="date" id="sim-date"></div>
-                    <div><label>Cantidad (€)</label><input type="number" id="sim-amount" placeholder="1000" value="1000"></div>
-                    <button onclick="runSimulation()">Calcular</button>
+                    <div><label>Investment Date</label><input type="date" id="sim-date"></div>
+                    <div><label>Amount (€)</label><input type="number" id="sim-amount" placeholder="1000" value="1000"></div>
+                    <button onclick="runSimulation()">Calculate</button>
                 </div>
                 <div class="sim-result" id="sim-result"></div>
             </div>
             <div class="section">
-                <h2>📜 Historial de Compras</h2>
+                <h2>📜 Purchase History</h2>
                 <table class="portfolio-table">
-                    <thead><tr><th>Fecha</th><th>Ticker</th><th>Empresa</th><th>Acciones</th><th>Precio Unitario</th><th>Total</th><th>Notas</th></tr></thead>
+                    <thead><tr><th>Date</th><th>Ticker</th><th>Company</th><th>Shares</th><th>Price/Share</th><th>Total</th><th>Notes</th><th></th></tr></thead>
                     <tbody id="history-body"></tbody>
                 </table>
             </div>
@@ -107,32 +121,34 @@
     <!-- Add/Edit Modal -->
     <div class="modal" id="purchase-modal">
         <div class="modal-content">
-            <h3 id="modal-title">Añadir Compra</h3>
+            <h3 id="modal-title">Add Purchase</h3>
             <div class="modal-form">
-                <div><label>Fecha</label><input type="date" id="p-date"></div>
+                <div><label>Date</label><input type="date" id="p-date"></div>
                 <div><label>Ticker</label><input type="text" id="p-ticker" placeholder="VOO, AAPL, SPY..." list="ticker-list"></div>
                 <datalist id="ticker-list"><option value="VOO"><option value="VTI"><option value="SPY"><option value="QQQ"><option value="AAPL"><option value="MSFT"><option value="CCJ"><option value="NEE"><option value="VEA"><option value="VT"><option value="BND"></datalist>
-                <div><label>Empresa</label><input type="text" id="p-company" placeholder="Nombre de la empresa"></div>
-                <div><label>Acciones</label><input type="number" id="p-shares" step="0.0001" placeholder="10"></div>
-                <div><label>Precio por acción (€)</label><input type="number" id="p-price" step="0.01" placeholder="100"></div>
-                <div><label>Notas</label><input type="text" id="p-notes" placeholder="Opcional"></div>
+                <div><label>Company (optional)</label><input type="text" id="p-company" placeholder="Auto-filled if empty"></div>
+                <div><label>Shares</label><input type="number" id="p-shares" step="0.0001" placeholder="10"></div>
+                <div><label>Price per Share (€)</label><input type="number" id="p-price" step="0.01" placeholder="100"></div>
+                <div><label>Notes (optional)</label><input type="text" id="p-notes" placeholder=""></div>
             </div>
             <div class="modal-buttons">
-                <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
-                <button class="btn-delete" id="btn-delete" style="display:none" onclick="deletePurchase()">Borrar</button>
-                <button class="btn-save" onclick="savePurchase()">Guardar</button>
+                <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+                <button class="btn-delete" id="btn-delete" style="display:none" onclick="deletePurchase()">Delete</button>
+                <button class="btn-save" onclick="savePurchase()">Save</button>
             </div>
         </div>
     </div>
+    
+    <div class="toast" id="toast"></div>
 
     <script>
-        const PORTFOLIO_FILE = 'data/portfolio.json';
+        const PORTFOLIO_KEY = 'invsim_portfolio';
         const PRICES_URL = 'data/prices.json';
-        const GITHUB_RAW = 'https://raw.githubusercontent.com/BraulioPastran/inversion-simulator/main';
         
         let portfolio = { purchases: [] };
         let prices = { prices: {}, history: {} };
         let editingIndex = null;
+        let currentPortfolio = 'default';
         
         function formatCurrency(v) { return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v); }
         function formatPercent(v) { return (v >= 0 ? '+' : '') + v.toFixed(2) + '%'; }
@@ -140,21 +156,46 @@
         function getCompanyName(ticker) {
             const names = {
                 'VOO': 'Vanguard S&P 500 ETF', 'VTI': 'Vanguard Total Stock Market',
-                'SPY': 'SPDR S&P 500 ETF', 'QQQ': 'Invesco QQQ', 'AAPL': 'Apple Inc.',
-                'MSFT': 'Microsoft Corp.', 'CCJ': 'Cameco Corp.', 'NEE': 'NextEra Energy',
-                'VEA': 'Vanguard FTSE Developed Markets', 'VT': 'Vanguard Total World',
-                'BND': 'Vanguard Total Bond Market', 'AGG': 'iShares Core US Aggregate Bond'
+                'SPY': 'SPDR S&P 500 ETF Trust', 'QQQ': 'Invesco QQQ Trust',
+                'AAPL': 'Apple Inc.', 'MSFT': 'Microsoft Corp.', 'CCJ': 'Cameco Corp.',
+                'NEE': 'NextEra Energy', 'VEA': 'Vanguard FTSE Developed Markets',
+                'VT': 'Vanguard Total World Stock ETF', 'BND': 'Vanguard Total Bond Market'
             };
             return names[ticker] || ticker;
         }
         
+        function savePortfolioToStorage() {
+            localStorage.setItem(PORTFOLIO_KEY, JSON.stringify(portfolio));
+        }
+        
+        function loadPortfolioFromStorage() {
+            const saved = localStorage.getItem(PORTFOLIO_KEY);
+            if (saved) {
+                try {
+                    portfolio = JSON.parse(saved);
+                } catch (e) {}
+            }
+        }
+        
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 3000);
+        }
+        
         async function loadData() {
-            const [pResp, prResp] = await Promise.all([
-                fetch(PORTFOLIO_FILE + '?t=' + Date.now()),
-                fetch(PRICES_URL + '?t=' + Date.now())
-            ]);
-            portfolio = await pResp.json();
+            const prResp = await fetch(PRICES_URL + '?t=' + Date.now());
             prices = await prResp.json();
+            loadPortfolioFromStorage();
+        }
+        
+        function switchPortfolio(name) {
+            currentPortfolio = name;
+            document.querySelectorAll('.portfolio-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById('portfolio-name').textContent = name;
+            render();
         }
         
         function render() {
@@ -186,7 +227,7 @@
             gpEl.className = 'card-value ' + (totalGainPercent >= 0 ? 'positive' : 'negative');
             
             // Portfolio table
-            document.getElementById('portfolio-body').innerHTML = items.map(i => `
+            document.getElementById('portfolio-body').innerHTML = items.length ? items.map(i => `
                 <tr>
                     <td class="ticker">${i.ticker}</td>
                     <td class="company">${i.company || getCompanyName(i.ticker)}</td>
@@ -199,7 +240,7 @@
                     <td class="${i.gain >= 0 ? 'positive' : 'negative'}">${formatCurrency(i.gain)}</td>
                     <td><button onclick="editPurchase(${i.idx})" style="background:#444;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;color:#fff;">✏️</button></td>
                 </tr>
-            `).join('');
+            `).join('') : '<tr><td colspan="10" style="text-align:center;color:#888;padding:40px;">No purchases yet. Click "+ Add Purchase" to start!</td></tr>';
             
             // History table
             const sorted = [...portfolio.purchases].reverse();
@@ -213,14 +254,15 @@
                     <td>${formatCurrency(parseFloat(p.price))}</td>
                     <td>${formatCurrency(parseFloat(p.shares) * parseFloat(p.price))}</td>
                     <td>${p.notes || '-'}</td>
+                    <td><button onclick="editPurchase(${realIdx})" style="background:#444;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;color:#fff;">✏️</button></td>
                 </tr>`;
             }).join('');
             
-            document.getElementById('last-updated').textContent = `Precios: ${prices.updated || '-'}`;
+            document.getElementById('last-updated').textContent = `Prices updated: ${prices.updated || '-'}`;
             document.getElementById('loading').style.display = 'none';
             document.getElementById('content').style.display = 'block';
             
-            // Default sim date
+            // Default sim date (5 years ago)
             const fiveYearsAgo = new Date();
             fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
             document.getElementById('sim-date').valueAsDate = fiveYearsAgo;
@@ -228,7 +270,7 @@
         
         function openAddModal() {
             editingIndex = null;
-            document.getElementById('modal-title').textContent = 'Añadir Compra';
+            document.getElementById('modal-title').textContent = 'Add Purchase';
             document.getElementById('p-date').valueAsDate = new Date();
             document.getElementById('p-ticker').value = '';
             document.getElementById('p-company').value = '';
@@ -242,7 +284,7 @@
         function editPurchase(idx) {
             editingIndex = idx;
             const p = portfolio.purchases[idx];
-            document.getElementById('modal-title').textContent = 'Editar Compra';
+            document.getElementById('modal-title').textContent = 'Edit Purchase';
             document.getElementById('p-date').value = p.date;
             document.getElementById('p-ticker').value = p.ticker;
             document.getElementById('p-company').value = p.company || '';
@@ -266,7 +308,7 @@
             const notes = document.getElementById('p-notes').value;
             
             if (!date || !ticker || !shares || !price) {
-                alert('Completa los campos obligatorios');
+                alert('Fill in all required fields');
                 return;
             }
             
@@ -274,31 +316,25 @@
             
             if (editingIndex !== null) {
                 portfolio.purchases[editingIndex] = purchase;
+                showToast('✅ Purchase updated!');
             } else {
                 portfolio.purchases.push(purchase);
+                showToast('✅ Purchase added!');
             }
             
-            downloadPortfolio();
+            savePortfolioToStorage();
             closeModal();
+            render();
         }
         
         function deletePurchase() {
-            if (editingIndex !== null && confirm('¿Borrar esta compra?')) {
+            if (editingIndex !== null && confirm('Delete this purchase?')) {
                 portfolio.purchases.splice(editingIndex, 1);
-                downloadPortfolio();
+                savePortfolioToStorage();
+                showToast('🗑️ Purchase deleted');
                 closeModal();
+                render();
             }
-        }
-        
-        function downloadPortfolio() {
-            const blob = new Blob([JSON.stringify(portfolio, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'portfolio.json';
-            a.click();
-            URL.revokeObjectURL(url);
-            alert('Descarga portfolio.json y súbelo a GitHub (data/portfolio.json)');
         }
         
         function runSimulation() {
@@ -306,27 +342,26 @@
             const dateStr = document.getElementById('sim-date').value;
             const amount = parseFloat(document.getElementById('sim-amount').value);
             
-            if (!dateStr || !amount) { alert('Completa todos los campos'); return; }
+            if (!dateStr || !amount) { alert('Fill in all fields'); return; }
             
             const tickerData = prices.history[ticker];
-            if (!tickerData) {
-                alert('No hay datos para ' + ticker);
+            if (!tickerData || (!tickerData.weekly && !tickerData.monthly)) {
+                document.getElementById('sim-result').classList.add('show');
+                document.getElementById('sim-result').innerHTML = `<p style="color:#ff4444;">❌ No historical data for ${ticker}</p>`;
                 return;
             }
             
             const buyDate = new Date(dateStr);
             const dateStrSort = dateStr;
             
-            // Try weekly first, then monthly
-            let buyPrice = null;
             const weekly = tickerData.weekly || {};
             const monthly = tickerData.monthly || {};
             
-            // Find closest weekly date <= requested
+            // Find closest price <= requested date
+            let buyPrice = null;
             for (const d of Object.keys(weekly).sort()) {
                 if (d <= dateStrSort) buyPrice = weekly[d];
             }
-            // If no weekly, try monthly
             if (!buyPrice) {
                 for (const d of Object.keys(monthly).sort()) {
                     if (d <= dateStrSort) buyPrice = monthly[d];
@@ -335,7 +370,7 @@
             
             if (!buyPrice) {
                 document.getElementById('sim-result').classList.add('show');
-                document.getElementById('sim-result').innerHTML = `<p style="color:#ff4444;">❌ No hay datos para ${ticker} en ${buyDate.toLocaleDateString('es-ES')}</p><p style="color:#888;font-size:0.85rem;margin-top:10px;">Prueba con una fecha más reciente.</p>`;
+                document.getElementById('sim-result').innerHTML = `<p style="color:#ff4444;">❌ No data for ${ticker} on ${buyDate.toLocaleDateString('es-ES')}</p><p style="color:#888;font-size:0.85rem;margin-top:10px;">Try a more recent date.</p>`;
                 return;
             }
             
@@ -346,14 +381,16 @@
             const gain = currentValue - amount;
             const gainPercent = (gain / amount) * 100;
             
+            const years = ((new Date() - buyDate) / (1000 * 60 * 60 * 24 * 365)).toFixed(1);
+            
             document.getElementById('sim-result').classList.add('show');
             document.getElementById('sim-result').innerHTML = `
-                <h3 style="margin-bottom:15px;color:#00d4ff;">📊 ${ticker}: ${formatCurrency(amount)} el ${buyDate.toLocaleDateString('es-ES')}</h3>
-                <p style="margin-bottom:10px;"><strong>Precio compra:</strong> ${formatCurrency(buyPrice)} | <strong>Precio actual:</strong> ${formatCurrency(currentPrice)}</p>
-                <p style="margin-bottom:10px;"><strong>Acciones:</strong> ${shares.toFixed(4)}</p>
-                <p style="margin-bottom:10px;"><strong>Valor ahora:</strong> <span class="${gain >= 0 ? 'positive' : 'negative'}">${formatCurrency(currentValue)}</span></p>
-                <p><strong>Ganancia/Pérdida:</strong> <span class="${gain >= 0 ? 'positive' : 'negative'}" style="font-size:1.3rem;font-weight:bold;">${formatCurrency(gain)} (${formatPercent(gainPercent)})</span></p>
-                <p style="color:#888;font-size:0.85rem;margin-top:15px;">* Basado en precios semanales/mensuales. No incluye dividendos ni comisiones.</p>
+                <h3 style="margin-bottom:15px;color:#00d4ff;">📊 ${ticker}: €${amount.toFixed(2)} invested on ${buyDate.toLocaleDateString('es-ES')} (${years} years ago)</h3>
+                <p style="margin-bottom:10px;"><strong>Buy price:</strong> ${formatCurrency(buyPrice)} | <strong>Current price:</strong> ${formatCurrency(currentPrice)}</p>
+                <p style="margin-bottom:10px;"><strong>Shares purchased:</strong> ${shares.toFixed(4)}</p>
+                <p style="margin-bottom:10px;"><strong>Current value:</strong> <span class="${gain >= 0 ? 'positive' : 'negative'}">${formatCurrency(currentValue)}</span></p>
+                <p><strong>Total gain/loss:</strong> <span class="${gain >= 0 ? 'positive' : 'negative'}" style="font-size:1.3rem;font-weight:bold;">${formatCurrency(gain)} (${formatPercent(gainPercent)})</span></p>
+                <p style="color:#888;font-size:0.85rem;margin-top:15px;">* Based on weekly/monthly closing prices. Does not include dividends or fees.</p>
             `;
         }
         
