@@ -43,7 +43,17 @@
         .toast { position: fixed; bottom: 20px; right: 20px; background: #00ff88; color: #000; padding: 12px 24px; border-radius: 8px; font-weight: bold; display: none; z-index: 1000; }
         .toast.show { display: block; }
         
-        /* Modal - simple 3 fields */
+        /* Autocomplete styles */
+        .autocomplete-wrapper { position: relative; }
+        .autocomplete-wrapper input { width: 100%; }
+        .autocomplete-list { position: absolute; top: 100%; left: 0; right: 0; background: #252540; border: 1px solid #333; border-radius: 8px; max-height: 200px; overflow-y: auto; z-index: 100; display: none; }
+        .autocomplete-list.show { display: block; }
+        .autocomplete-item { padding: 10px 12px; cursor: pointer; display: flex; justify-content: space-between; }
+        .autocomplete-item:hover { background: #333; }
+        .autocomplete-item .ticker-sym { font-weight: bold; color: #00d4ff; }
+        .autocomplete-item .ticker-name { color: #888; font-size: 0.85rem; }
+        
+        /* Modal */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center; }
         .modal.show { display: flex; }
         .modal-content { background: #1a1a2e; border-radius: 16px; padding: 30px; width: 90%; max-width: 450px; }
@@ -58,11 +68,8 @@
         .btn-delete { background: #ff4444; color: #fff; }
         .btn-add { background: linear-gradient(135deg, #00d4ff, #7b2fff); border: none; border-radius: 8px; padding: 8px 16px; cursor: pointer; font-size: 0.85rem; }
         
-        /* Preview of calculated values */
         .calc-preview { background: #252540; border-radius: 8px; padding: 15px; margin-top: 10px; }
         .calc-preview-row { display: flex; justify-content: space-between; padding: 5px 0; }
-        .calc-preview-label { color: #888; }
-        .calc-preview-value { font-weight: bold; }
         
         @media (max-width: 768px) { .sim-form { grid-template-columns: 1fr; } h1 { font-size: 1.8rem; } }
     </style>
@@ -94,7 +101,11 @@
                 <h2>🔮 Hypothetical Simulator</h2>
                 <p style="color: #888; margin-bottom: 20px;">How much would you have earned if you had invested X years ago?</p>
                 <div class="sim-form">
-                    <div><label>Ticker</label><select id="sim-ticker"><option value="SPY">SPY (S&P 500)</option><option value="VOO">VOO (S&P 500)</option><option value="VTI">VTI (Total Market)</option><option value="QQQ">QQQ (NASDAQ)</option><option value="AAPL">AAPL</option><option value="MSFT">MSFT</option></select></div>
+                    <div class="autocomplete-wrapper">
+                        <label>Ticker</label>
+                        <input type="text" id="sim-ticker" placeholder="Search ticker..." autocomplete="off" oninput="showAutocomplete('sim-ticker', this.value)" onblur="setTimeout(() => hideAutocomplete('sim-ticker'), 200)">
+                        <div class="autocomplete-list" id="sim-ticker-list"></div>
+                    </div>
                     <div><label>Investment Date</label><input type="date" id="sim-date"></div>
                     <div><label>Amount (€)</label><input type="number" id="sim-amount" placeholder="1000" value="1000"></div>
                     <button onclick="runSimulation()">Calculate</button>
@@ -112,19 +123,22 @@
         </div>
     </div>
     
-    <!-- Simple Add/Edit Modal -->
+    <!-- Add/Edit Modal -->
     <div class="modal" id="purchase-modal">
         <div class="modal-content">
             <h3 id="modal-title">Add Purchase</h3>
             <div class="modal-form">
                 <div><label>Date</label><input type="date" id="p-date"></div>
-                <div><label>Ticker</label><input type="text" id="p-ticker" placeholder="MSFT, VOO, SPY..." list="ticker-list" oninput="updateCalcPreview()"></div>
-                <datalist id="ticker-list"><option value="VOO"><option value="VTI"><option value="SPY"><option value="QQQ"><option value="AAPL"><option value="MSFT"><option value="CCJ"><option value="NEE"><option value="VEA"><option value="VT"><option value="BND"></datalist>
+                <div class="autocomplete-wrapper">
+                    <label>Ticker</label>
+                    <input type="text" id="p-ticker" placeholder="Search ticker..." autocomplete="off" oninput="onTickerInput()">
+                    <div class="autocomplete-list" id="p-ticker-list"></div>
+                </div>
                 <div><label>Amount (€)</label><input type="number" id="p-amount" placeholder="1000" oninput="updateCalcPreview()"></div>
             </div>
             <div class="calc-preview" id="calc-preview" style="display:none;">
-                <div class="calc-preview-row"><span class="calc-preview-label">Shares:</span><span class="calc-preview-value" id="preview-shares">-</span></div>
-                <div class="calc-preview-row"><span class="calc-preview-label">Price/share:</span><span class="calc-preview-value" id="preview-price">-</span></div>
+                <div class="calc-preview-row"><span>Shares:</span><span id="preview-shares">-</span></div>
+                <div class="calc-preview-row"><span>Price/share:</span><span id="preview-price">-</span></div>
             </div>
             <div class="modal-buttons">
                 <button class="btn-cancel" onclick="closeModal()">Cancel</button>
@@ -137,8 +151,23 @@
     <div class="toast" id="toast"></div>
 
     <script>
-        const PORTFOLIO_KEY = 'inv_sim_portfolio';
+        const PORTFOLIO_KEY = '***';
         const PRICES_URL = 'data/prices.json';
+        
+        const TICKERS = {
+            'VOO': 'Vanguard S&P 500 ETF', 'VTI': 'Vanguard Total Stock Market',
+            'SPY': 'SPDR S&P 500 ETF Trust', 'QQQ': 'Invesco QQQ Trust',
+            'AAPL': 'Apple Inc.', 'MSFT': 'Microsoft Corp.', 'CCJ': 'Cameco Corp.',
+            'NEE': 'NextEra Energy', 'VEA': 'Vanguard FTSE Developed Markets',
+            'VT': 'Vanguard Total World Stock ETF', 'BND': 'Vanguard Total Bond Market',
+            'AMD': 'Advanced Micro Devices', 'NVDA': 'NVIDIA Corp.', 'GOOGL': 'Alphabet Inc.',
+            'AMZN': 'Amazon.com Inc.', 'TSLA': 'Tesla Inc.', 'META': 'Meta Platforms',
+            'BRK.B': 'Berkshire Hathaway', 'JPM': 'JPMorgan Chase', 'V': 'Visa Inc.',
+            'JNJ': 'Johnson & Johnson', 'UNH': 'UnitedHealth Group', 'HD': 'Home Depot',
+            'PG': 'Procter & Gamble', 'MA': 'Mastercard', 'DIS': 'Walt Disney Co.',
+            'NFLX': 'Netflix Inc.', 'PYPL': 'PayPal Holdings', 'INTC': 'Intel Corp.',
+            'CRM': 'Salesforce Inc.', 'ADBE': 'Adobe Inc.', 'CMCSA': 'Comcast Corp.'
+        };
         
         let portfolio = { purchases: [] };
         let prices = { prices: {}, history: {} };
@@ -147,26 +176,10 @@
         function formatCurrency(v) { return '€' + v.toFixed(2).replace('.', ','); }
         function formatPercent(v) { return (v >= 0 ? '+' : '') + v.toFixed(2) + '%'; }
         
-        function getCompanyName(ticker) {
-            const names = {
-                'VOO': 'Vanguard S&P 500 ETF', 'VTI': 'Vanguard Total Stock Market',
-                'SPY': 'SPDR S&P 500 ETF Trust', 'QQQ': 'Invesco QQQ Trust',
-                'AAPL': 'Apple Inc.', 'MSFT': 'Microsoft Corp.', 'CCJ': 'Cameco Corp.',
-                'NEE': 'NextEra Energy', 'VEA': 'Vanguard FTSE Developed Markets',
-                'VT': 'Vanguard Total World Stock ETF', 'BND': 'Vanguard Total Bond Market'
-            };
-            return names[ticker] || ticker;
-        }
-        
-        function savePortfolioToStorage() {
-            localStorage.setItem(PORTFOLIO_KEY, JSON.stringify(portfolio));
-        }
-        
+        function savePortfolioToStorage() { localStorage.setItem(PORTFOLIO_KEY, JSON.stringify(portfolio)); }
         function loadPortfolioFromStorage() {
             const saved = localStorage.getItem(PORTFOLIO_KEY);
-            if (saved) {
-                try { portfolio = JSON.parse(saved); } catch (e) {}
-            }
+            if (saved) { try { portfolio = JSON.parse(saved); } catch (e) {} }
         }
         
         function showToast(msg) {
@@ -174,6 +187,40 @@
             t.textContent = msg;
             t.classList.add('show');
             setTimeout(() => t.classList.remove('show'), 3000);
+        }
+        
+        function showAutocomplete(inputId, query) {
+            const list = document.getElementById(inputId + '-list');
+            if (!query) { list.classList.remove('show'); return; }
+            
+            const q = query.toUpperCase();
+            const matches = Object.keys(TICKERS).filter(t => t.includes(q) || TICKERS[t].toUpperCase().includes(q)).slice(0, 10);
+            
+            if (!matches.length) { list.classList.remove('show'); return; }
+            
+            list.innerHTML = matches.map(t => `
+                <div class="autocomplete-item" onclick="selectTicker('${inputId}', '${t}')">
+                    <span class="ticker-sym">${t}</span>
+                    <span class="ticker-name">${TICKERS[t]}</span>
+                </div>
+            `).join('');
+            list.classList.add('show');
+        }
+        
+        function hideAutocomplete(inputId) {
+            setTimeout(() => document.getElementById(inputId + '-list').classList.remove('show'), 200);
+        }
+        
+        function selectTicker(inputId, ticker) {
+            document.getElementById(inputId).value = ticker;
+            hideAutocomplete(inputId);
+            if (inputId === 'p-ticker') updateCalcPreview();
+        }
+        
+        function onTickerInput() {
+            const val = document.getElementById('p-ticker').value;
+            showAutocomplete('p-ticker', val);
+            updateCalcPreview();
         }
         
         function getPriceAtDate(ticker, dateStr) {
@@ -195,13 +242,38 @@
             return price;
         }
         
+        function getCurrentPriceData(ticker) {
+            // Try to get from prices.prices[ticker]
+            const p = prices.prices?.[ticker];
+            if (p && p.current) return p;
+            
+            // Fallback: use latest from history
+            const hist = prices.history?.[ticker];
+            if (!hist) return { current: 0, previousClose: 0, changePercent: 0 };
+            
+            const weekly = Object.entries(hist.weekly || {}).sort().reverse();
+            const monthly = Object.entries(hist.monthly || {}).sort().reverse();
+            
+            if (weekly.length >= 2) {
+                const current = weekly[0][1];
+                const prev = weekly[1][1];
+                return { current, previousClose: prev, changePercent: ((current - prev) / prev) * 100 };
+            }
+            if (monthly.length >= 2) {
+                const current = monthly[0][1];
+                const prev = monthly[1][1];
+                return { current, previousClose: prev, changePercent: ((current - prev) / prev) * 100 };
+            }
+            return { current: weekly[0]?.[1] || monthly[0]?.[1] || 0, previousClose: 0, changePercent: 0 };
+        }
+        
         function updateCalcPreview() {
             const ticker = document.getElementById('p-ticker').value.toUpperCase();
             const dateStr = document.getElementById('p-date').value;
             const amount = parseFloat(document.getElementById('p-amount').value);
             
             const preview = document.getElementById('calc-preview');
-            if (!ticker || !dateStr || !amount || amount <= 0) {
+            if (!ticker || !TICKERS[ticker] || !dateStr || !amount || amount <= 0) {
                 preview.style.display = 'none';
                 return;
             }
@@ -228,7 +300,7 @@
             let totalInvested = 0, totalCurrentValue = 0;
             const items = portfolio.purchases.map((p, idx) => {
                 const shares = parseFloat(p.shares), price = parseFloat(p.price);
-                const cur = prices.prices[p.ticker] || {};
+                const cur = getCurrentPriceData(p.ticker);
                 const currentPrice = cur.current || price;
                 const currentValue = shares * currentPrice;
                 const invested = shares * price;
@@ -253,7 +325,7 @@
             document.getElementById('portfolio-body').innerHTML = items.length ? items.map(i => `
                 <tr>
                     <td class="ticker">${i.ticker}</td>
-                    <td class="company">${i.company || getCompanyName(i.ticker)}</td>
+                    <td class="company">${i.company || TICKERS[i.ticker] || '-'}</td>
                     <td>${i.shares.toFixed(4)}</td>
                     <td>${formatCurrency(i.price)}</td>
                     <td>${formatCurrency(i.currentPrice)}</td>
@@ -265,17 +337,16 @@
                 </tr>
             `).join('') : '<tr><td colspan="10" style="text-align:center;color:#888;padding:40px;">No purchases yet. Click "+ Add Purchase" to start!</td></tr>';
             
-            // History table (simplified)
+            // History table
             const sorted = [...portfolio.purchases].reverse();
             document.getElementById('history-body').innerHTML = sorted.map((p, idx) => {
                 const realIdx = portfolio.purchases.length - 1 - idx;
-                const amount = parseFloat(p.shares) * parseFloat(p.price);
                 return `<tr>
                     <td>${p.date}</td>
                     <td class="ticker">${p.ticker}</td>
                     <td>${parseFloat(p.shares).toFixed(4)}</td>
                     <td>${formatCurrency(parseFloat(p.price))}</td>
-                    <td>${formatCurrency(amount)}</td>
+                    <td>${formatCurrency(parseFloat(p.shares) * parseFloat(p.price))}</td>
                     <td><button onclick="editPurchase(${realIdx})" style="background:#444;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;color:#fff;">✏️</button></td>
                 </tr>`;
             }).join('');
@@ -313,19 +384,15 @@
             document.getElementById('purchase-modal').classList.add('show');
         }
         
-        function closeModal() {
-            document.getElementById('purchase-modal').classList.remove('show');
-        }
+        function closeModal() { document.getElementById('purchase-modal').classList.remove('show'); }
         
         function savePurchase() {
             const dateStr = document.getElementById('p-date').value;
             const ticker = document.getElementById('p-ticker').value.toUpperCase();
             const amount = parseFloat(document.getElementById('p-amount').value);
             
-            if (!dateStr || !ticker || !amount || amount <= 0) {
-                alert('Fill in all fields');
-                return;
-            }
+            if (!dateStr || !ticker || !amount || amount <= 0) { alert('Fill in all fields'); return; }
+            if (!TICKERS[ticker]) { alert('Unknown ticker: ' + ticker); return; }
             
             const priceAtDate = getPriceAtDate(ticker, dateStr);
             if (!priceAtDate) {
@@ -333,16 +400,7 @@
                 return;
             }
             
-            const shares = amount / priceAtDate;
-            const price = priceAtDate;
-            
-            const purchase = {
-                date: dateStr,
-                ticker: ticker,
-                company: getCompanyName(ticker),
-                shares: shares,
-                price: price
-            };
+            const purchase = { date: dateStr, ticker, company: TICKERS[ticker], shares: amount / priceAtDate, price: priceAtDate };
             
             if (editingIndex !== null) {
                 portfolio.purchases[editingIndex] = purchase;
@@ -368,39 +426,31 @@
         }
         
         function runSimulation() {
-            const ticker = document.getElementById('sim-ticker').value;
+            const ticker = document.getElementById('sim-ticker').value.toUpperCase();
             const dateStr = document.getElementById('sim-date').value;
             const amount = parseFloat(document.getElementById('sim-amount').value);
             
+            if (!ticker) { alert('Select a ticker'); return; }
             if (!dateStr || !amount) { alert('Fill in all fields'); return; }
             
-            const tickerData = prices.history[ticker];
-            if (!tickerData || (!tickerData.weekly && !tickerData.monthly)) {
-                document.getElementById('sim-result').classList.add('show');
-                document.getElementById('sim-result').innerHTML = `<p style="color:#ff4444;">❌ No historical data for ${ticker}</p>`;
-                return;
-            }
-            
-            const buyDate = new Date(dateStr);
             const price = getPriceAtDate(ticker, dateStr);
-            
             if (!price) {
                 document.getElementById('sim-result').classList.add('show');
-                document.getElementById('sim-result').innerHTML = `<p style="color:#ff4444;">❌ No data for ${ticker} on ${buyDate.toLocaleDateString('es-ES')}</p><p style="color:#888;font-size:0.85rem;margin-top:10px;">Try a more recent date.</p>`;
+                document.getElementById('sim-result').innerHTML = `<p style="color:#ff4444;">❌ No data for ${ticker} on ${new Date(dateStr).toLocaleDateString('es-ES')}. Try a more recent date.</p>`;
                 return;
             }
             
             const shares = amount / price;
-            const curData = prices.prices[ticker];
-            const currentPrice = curData?.current || price;
+            const cur = getCurrentPriceData(ticker);
+            const currentPrice = cur.current || price;
             const currentValue = shares * currentPrice;
             const gain = currentValue - amount;
             const gainPercent = (gain / amount) * 100;
-            const years = ((new Date() - buyDate) / (1000 * 60 * 60 * 24 * 365)).toFixed(1);
+            const years = ((new Date() - new Date(dateStr)) / (1000 * 60 * 60 * 24 * 365)).toFixed(1);
             
             document.getElementById('sim-result').classList.add('show');
             document.getElementById('sim-result').innerHTML = `
-                <h3 style="margin-bottom:15px;color:#00d4ff;">📊 ${ticker}: ${formatCurrency(amount)} invested ${buyDate.toLocaleDateString('es-ES')} (${years} years ago)</h3>
+                <h3 style="margin-bottom:15px;color:#00d4ff;">📊 ${ticker}: ${formatCurrency(amount)} invested ${new Date(dateStr).toLocaleDateString('es-ES')} (${years} years ago)</h3>
                 <p style="margin-bottom:10px;"><strong>Buy price:</strong> ${formatCurrency(price)} | <strong>Current price:</strong> ${formatCurrency(currentPrice)}</p>
                 <p style="margin-bottom:10px;"><strong>Shares purchased:</strong> ${shares.toFixed(4)}</p>
                 <p style="margin-bottom:10px;"><strong>Current value:</strong> <span class="${gain >= 0 ? 'positive' : 'negative'}">${formatCurrency(currentValue)}</span></p>
