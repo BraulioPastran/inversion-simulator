@@ -108,10 +108,8 @@ To force a full 15-year history refresh:
 
 ## Known Issues
 
-### tickers.json is empty after GitHub Actions run
-If `data/tickers.json` shows `"tickers": []`, the Yahoo Finance API call for ticker info may be failing. The app has a **built-in fallback ticker list** so autocomplete still works, but names may be generic.
-
-To fix: Check GitHub Actions logs for errors and verify Yahoo Finance API accessibility from the runner.
+### Some tickers show generic names (e.g. "SQ" instead of "Block Inc.")
+A small subset (~5) of tickers in the autocomplete list may show only the symbol as their name due to Yahoo Finance search not returning a match. The built-in fallback ticker list handles these for offline use.
 
 ---
 
